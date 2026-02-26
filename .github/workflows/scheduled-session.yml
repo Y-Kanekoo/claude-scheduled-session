@@ -2,7 +2,7 @@ name: Claude Code Scheduled Session
 
 on:
   schedule:
-    # JST = UTC + 9
+    # JST = UTC + 9（5時間間隔でレート制限ウィンドウを管理）
     - cron: '0 21 * * *'  # 06:00 JST
     - cron: '0 2 * * *'   # 11:00 JST
     - cron: '0 7 * * *'   # 16:00 JST
@@ -19,5 +19,5 @@ jobs:
 
       - name: セッションを開始
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: claude -p "現在時刻を教えてください" --max-turns 1
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: claude -p "hello" --max-turns 1
