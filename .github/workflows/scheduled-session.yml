@@ -1,0 +1,23 @@
+name: Claude Code Scheduled Session
+
+on:
+  schedule:
+    # JST = UTC + 9
+    - cron: '0 21 * * *'  # 06:00 JST
+    - cron: '0 2 * * *'   # 11:00 JST
+    - cron: '0 7 * * *'   # 16:00 JST
+    - cron: '0 12 * * *'  # 21:00 JST
+  workflow_dispatch: # 手動実行用
+
+jobs:
+  session:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Claude Code をインストール
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: セッションを開始
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: claude -p "現在時刻を教えてください" --max-turns 1
