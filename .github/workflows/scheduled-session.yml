@@ -2,11 +2,11 @@ name: Claude Code Scheduled Session
 
 on:
   schedule:
-    # JST = UTC + 9（5時間間隔でレート制限ウィンドウを管理）
-    - cron: '0 21 * * *'  # 06:00 JST
-    - cron: '0 2 * * *'   # 11:00 JST
-    - cron: '0 7 * * *'   # 16:00 JST
-    - cron: '0 12 * * *'  # 21:00 JST
+    # JST = UTC + 9（5時間40分間隔でレート制限ウィンドウを確実にリセット）
+    - cron: '0 21 * * *'   # 06:00 JST
+    - cron: '40 2 * * *'   # 11:40 JST
+    - cron: '20 8 * * *'   # 17:20 JST
+    - cron: '0 14 * * *'   # 23:00 JST
   workflow_dispatch: # 手動実行用
 
 jobs:
