@@ -1,76 +1,26 @@
 # セットアップ用プロンプト
 
-以下を Claude Code に貼り付けて実行してください。
+以下をAIコーディングエージェントへ渡すときの共通仕様。
 
----
+```text
+Claude CodeまたはCodexをGitHub Actionsから定期実行できるワークフローを保守してください。
 
-## プロンプト
+要件:
+- 定期実行は06:11 / 11:11 / 16:11 / 21:11 JST
+- Repository Variable `AI_PROVIDER`で`auto` / `codex` / `claude`を切り替える
+- `auto`は`OPENAI_API_KEY`、次に`ANTHROPIC_API_KEY`の存在順で選ぶ
+- Repository Variable `AI_PROMPT`で指示文を変更できる
+- Codexは公式`openai/codex-action@v1`を`read-only` sandboxで使う
+- Claude Codeは`ANTHROPIC_API_KEY`で非対話実行する
+- 認証情報はGitHub Secrets以外へ保存しない
+- GitHub権限は`contents: read`に限定する
+- 手動実行ではプロバイダーを一時的に上書きできる
+- Secret不足や未知のプロバイダーは、原因を明示して失敗させる
 
-```
-Claude Code Max Plan の5時間レート制限ウィンドウを自動管理する GitHub Actions ワークフローを作成してください。
-
-## 要件
-
-- GitHub Actions で5時間間隔（6:00 / 11:00 / 16:00 / 21:00 JST）にセッションを自動開始する
-- 認証は Max Plan の OAuth トークン（`claude setup-token` で生成）を使用し、API 課金は発生しない
-- トークンは GitHub Secrets に `CLAUDE_CODE_OAUTH_TOKEN` として登録する
-- 実行内容は `claude -p "hello" --max-turns 1` のみ（セッション開始がトリガー目的）
-- リポジトリは public で作成
-
-## 技術仕様
-
-### ワークフロー (.github/workflows/scheduled-session.yml)
-
-- cron スケジュール（JST = UTC + 9）:
-  - `0 21 * * *` → 06:00 JST
-  - `0 2 * * *`  → 11:00 JST
-  - `0 7 * * *`  → 16:00 JST
-  - `0 12 * * *` → 21:00 JST
-- workflow_dispatch で手動実行も可能
-- runs-on: ubuntu-latest
-- timeout-minutes: 5
-- npm install -g @anthropic-ai/claude-code でインストール
-- 環境変数 CLAUDE_CODE_OAUTH_TOKEN を secrets から読み込み
-
-## 手順
-
-1. 新規リポジトリを作成（public）
-2. ワークフローファイルと README.md を作成してプッシュ
-3. `claude setup-token` は対話型のため手動実行が必要 → 手順を案内してください
-4. `gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <ユーザー名>/<リポジトリ名>` でトークンを登録
-5. 手動テスト実行して成功を確認
-
-## 注意事項
-
-- GitHub Actions の cron には数十分〜最大2時間の遅延がある（ローリングウィンドウなので実害は小さい）
-- トークンの有効期限は約1年。年1回 `claude setup-token` で再生成が必要
-- GitHub Actions はリポジトリが60日間非アクティブだと自動停止される
-```
-
----
-
-## 既存リポジトリを Fork して使う場合
-
-上のプロンプトの代わりに、以下の手順だけでOKです:
-
-### 1. Fork
-
-https://github.com/Y-Kanekoo/claude-scheduled-session を Fork
-
-### 2. トークン生成
-
-```bash
-claude setup-token
-```
-
-### 3. GitHub Secrets に登録
-
-```bash
-gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <自分のユーザー名>/claude-scheduled-session
-```
-
-### 4. 動作確認
-
-```bash
-gh workflow run scheduled-session.yml -R <自分のユーザー名>/claude-scheduled-session
+設定場所とCLI:
+- GitHub: Settings > Secrets and variables > Actions
+- `gh secret set OPENAI_API_KEY -R <owner>/<repo>`
+- `gh secret set ANTHROPIC_API_KEY -R <owner>/<repo>`
+- `gh variable set AI_PROVIDER --body auto -R <owner>/<repo>`
+- `gh variable set AI_PROMPT --body "Respond with a short health-check message." -R <owner>/<repo>`
 ```
