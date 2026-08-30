@@ -1,94 +1,74 @@
-# claude-scheduled-session
+# AI Scheduled Session
 
-Claude Code Max Plan の **5時間レート制限ウィンドウ** を自動管理するツール。
+Claude Code または Codex を GitHub Actions から定期実行する。プロバイダーはワークフローを書き換えずに、GitHub の Repository Variable で恒久的に切り替えられる。
 
-GitHub Actions で5時間間隔でセッションを自動開始し、ウィンドウのリセットタイミングを制御する。追加の API 課金は発生しない（Max Plan サブスク内で動作）。
+## 実行時刻
 
-## 背景
+毎日 06:11 / 11:11 / 16:11 / 21:11 JST に実行する。GitHub Actions の混雑を避けるため、毎時0分から11分へずらしている。
 
-Max Plan のレート制限は **5時間ローリングウィンドウ** で管理されている。
+## 設定場所
 
-- ウィンドウは **最初のメッセージ送信時** に開始される
-- 5時間経過すると使用量がリセットされ、新しいウィンドウが始まる
-- 手動でタイミングを管理するのは面倒 → **自動化で解決**
+リポジトリの **Settings > Secrets and variables > Actions** を開く。
 
-## スケジュール
+### Secrets
 
-5時間間隔で1日4回、セッションを自動開始:
+利用するプロバイダーのキーだけを登録する。どちらも登録した場合、`auto` は Codex を優先する。
 
-| 時刻 (JST) | ウィンドウ |
-|-------------|-----------|
-| 06:00 | 06:00 〜 11:00 |
-| 11:00 | 11:00 〜 16:00 |
-| 16:00 | 16:00 〜 21:00 |
-| 21:00 | 21:00 〜 02:00 |
+| Secret名 | 用途 |
+|---|---|
+| `OPENAI_API_KEY` | Codex用。OpenAI Platformで作成した専用APIキー |
+| `ANTHROPIC_API_KEY` | Claude Code用。Anthropic Consoleで作成した専用APIキー |
 
-> **注**: GitHub Actions の cron には数十分〜最大2時間程度の遅延が発生します。この遅延が自然なバッファとなり、前のウィンドウ終了後にセッションが開始されるケースがほとんどです。
-
-## セットアップ
-
-### 1. リポジトリを Fork
-
-このリポジトリを自分のアカウントに Fork する。
-
-### 2. OAuth トークンを生成
+CLIで登録する場合:
 
 ```bash
-claude setup-token
+gh secret set OPENAI_API_KEY -R <ユーザー名>/claude-scheduled-session
+gh secret set ANTHROPIC_API_KEY -R <ユーザー名>/claude-scheduled-session
 ```
 
-ブラウザが開くので、Claude.ai アカウントで認証する。表示されたトークン（`sk-ant-oat01-...`）をコピー。
+キーはリポジトリや`.env`へ書かず、必ずGitHub Secretsへ登録する。各サービス側でこのワークフロー専用キーを発行し、利用上限を設定する。
 
-### 3. GitHub Secrets に登録
+### Variables
 
-Fork したリポジトリの **Settings > Secrets and variables > Actions** で以下を設定:
+同じ画面の **Variables** タブで設定する。
 
-| Secret 名 | 値 |
-|-----------|-----|
-| `CLAUDE_CODE_OAUTH_TOKEN` | 手順2で生成したトークン |
+| Variable名 | 値 | 説明 |
+|---|---|---|
+| `AI_PROVIDER` | `auto` / `codex` / `claude` | 定期実行で使うプロバイダー。未設定時は`auto` |
+| `AI_PROMPT` | 任意の指示文 | 実行するプロンプト。未設定時は短いヘルスチェック |
 
-CLI で登録する場合:
+推奨設定:
 
 ```bash
-gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <ユーザー名>/claude-scheduled-session
+gh variable set AI_PROVIDER --body auto -R <ユーザー名>/claude-scheduled-session
+gh variable set AI_PROMPT --body "Respond with a short health-check message." -R <ユーザー名>/claude-scheduled-session
 ```
 
-### 4. 完了
+`auto`の選択順は次のとおり。
 
-自動でスケジュール実行される。
+1. `OPENAI_API_KEY`があればCodex
+2. なければ`ANTHROPIC_API_KEY`でClaude Code
+3. どちらもなければ、必要なSecret名を表示して安全に失敗
 
-手動テスト: Actions タブ > "Claude Code Scheduled Session" > "Run workflow"
+手動実行時は **Actions > AI Scheduled Session > Run workflow** の選択欄で、その1回だけ`auto` / `codex` / `claude`を上書きできる。
 
-## スケジュールのカスタマイズ
+## 認証と料金
 
-`.github/workflows/scheduled-session.yml` の `cron` を編集:
+GitHub-hosted runnerはブラウザ認証を引き継がないため、非対話CIではAPIキーを使用する。どちらも各APIの従量課金となり、ChatGPTまたはClaudeの個人向け定額契約枠とは別扱いになる。
 
-```yaml
-schedule:
-  # JST = UTC + 9（5時間間隔）
-  - cron: '0 21 * * *'  # 06:00 JST
-  - cron: '0 2 * * *'   # 11:00 JST
-  - cron: '0 7 * * *'   # 16:00 JST
-  - cron: '0 12 * * *'  # 21:00 JST
-```
+- Codex: 公式の `openai/codex-action@v1` を使用し、`sandbox: read-only`で実行する
+- Claude Code: `ANTHROPIC_API_KEY`を環境変数としてCLIへ渡す
+- GitHub権限は`contents: read`のみ。チェックアウト時の認証情報も保持しない
 
-## セキュリティ
+## 保守
 
-| 観点 | 説明 |
-|------|------|
-| **トークン保管** | GitHub Secrets で暗号化保存。ログでも自動マスクされる |
-| **Fork からの実行** | `schedule` はデフォルトブランチでのみ実行。Fork からは発火しない |
-| **トークン漏洩時の影響** | セッション枠の消費のみ。金銭的被害なし（定額サブスク） |
-| **対処** | `claude setup-token` で再生成すれば旧トークンは無効化される |
+- APIキーは定期的にローテーションする
+- 漏洩の疑いがあれば、各サービスの管理画面で直ちに無効化する
+- 実行失敗時は最初の「プロバイダーと認証情報を確認」ステップを見る
+- 60日間リポジトリ活動がない場合、GitHubがスケジュールを自動停止することがある
 
-## メンテナンス
+## 参考
 
-| 項目 | 頻度 | 方法 |
-|------|------|------|
-| **トークン更新** | 約1年に1回 | `claude setup-token` → GitHub Secrets を更新 |
-| **ログ確認** | 任意 | GitHub Actions タブで実行履歴を確認 |
-
-## 注意事項
-
-- Max Plan には5時間ウィンドウの他に、**週次・月次の使用量上限**もある
-- GitHub Actions のスケジュールはリポジトリが60日間非アクティブだと自動停止される（適宜コミットで維持）
+- [Codex GitHub Action（OpenAI公式）](https://learn.chatgpt.com/docs/github-action)
+- [Codexの認証（OpenAI公式）](https://learn.chatgpt.com/docs/auth)
+- [Claude Codeのセットアップ（Anthropic公式）](https://docs.anthropic.com/en/docs/claude-code/getting-started)

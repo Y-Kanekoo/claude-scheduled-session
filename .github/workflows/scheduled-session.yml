@@ -1,23 +1,97 @@
-name: Claude Code Scheduled Session
+name: AI Scheduled Session
 
 on:
   schedule:
-    # JST = UTC + 9（5時間間隔 + GitHub Actions の遅延で自然にバッファが入る）
-    - cron: '0 21 * * *'  # 06:00 JST
-    - cron: '0 2 * * *'   # 11:00 JST
-    - cron: '0 7 * * *'   # 16:00 JST
-    - cron: '0 12 * * *'  # 21:00 JST
-  workflow_dispatch: # 手動実行用
+    # 毎時0分の混雑を避ける（JST = UTC + 9）
+    - cron: '11 21 * * *'  # 06:11 JST
+    - cron: '11 2 * * *'   # 11:11 JST
+    - cron: '11 7 * * *'   # 16:11 JST
+    - cron: '11 12 * * *'  # 21:11 JST
+  workflow_dispatch:
+    inputs:
+      provider:
+        description: 実行するAI CLI（autoは利用可能なSecretから自動選択）
+        required: false
+        default: auto
+        type: choice
+        options:
+          - auto
+          - codex
+          - claude
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-scheduled-session
+  cancel-in-progress: false
 
 jobs:
   session:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: プロバイダーと認証情報を確認
+        id: select
+        env:
+          REQUESTED_PROVIDER: ${{ inputs.provider || vars.AI_PROVIDER || 'auto' }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          case "$REQUESTED_PROVIDER" in
+            auto)
+              if [[ -n "$OPENAI_API_KEY" ]]; then
+                provider="codex"
+              elif [[ -n "$ANTHROPIC_API_KEY" ]]; then
+                provider="claude"
+              else
+                echo "::error::OPENAI_API_KEY または ANTHROPIC_API_KEY のRepository Secretを設定してください。"
+                exit 1
+              fi
+              ;;
+            codex)
+              if [[ -z "$OPENAI_API_KEY" ]]; then
+                echo "::error::AI_PROVIDER=codex にはRepository Secret OPENAI_API_KEYが必要です。"
+                exit 1
+              fi
+              provider="codex"
+              ;;
+            claude)
+              if [[ -z "$ANTHROPIC_API_KEY" ]]; then
+                echo "::error::AI_PROVIDER=claude にはRepository Secret ANTHROPIC_API_KEYが必要です。"
+                exit 1
+              fi
+              provider="claude"
+              ;;
+            *)
+              echo "::error::AI_PROVIDERはauto、codex、claudeのいずれかにしてください。"
+              exit 1
+              ;;
+          esac
+          echo "provider=$provider" >> "$GITHUB_OUTPUT"
+          echo "使用プロバイダー: $provider"
+
       - name: Claude Code をインストール
+        if: steps.select.outputs.provider == 'claude'
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: セッションを開始
+      - name: Claude Code セッションを開始
+        if: steps.select.outputs.provider == 'claude'
         env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: claude -p "hello" --max-turns 1
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          AI_PROMPT: ${{ vars.AI_PROMPT || 'Respond with a short health-check message.' }}
+        run: claude -p "$AI_PROMPT" --max-turns 1
+
+      - name: Codex用にリポジトリをチェックアウト
+        if: steps.select.outputs.provider == 'codex'
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Codex セッションを開始
+        if: steps.select.outputs.provider == 'codex'
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: ${{ vars.AI_PROMPT || 'Respond with a short health-check message.' }}
+          sandbox: read-only
