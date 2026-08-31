@@ -52,6 +52,24 @@ gh variable set AI_PROMPT --body "Respond with a short health-check message." -R
 
 手動実行時は **Actions > AI Scheduled Session > Run workflow** の選択欄で、その1回だけ`auto` / `codex` / `claude`を上書きできる。
 
+## CodexとClaude Codeの恒久指示
+
+両方のエージェントへ同じルールを適用する場合は、リポジトリ直下の`AGENTS.md`へ書く。
+`CLAUDE.md`は`@AGENTS.md`でその正本を読み込むため、共通ルールを二重管理しない。
+
+設定の種類ごとの保存場所は次のとおり。
+
+| 設定 | 保存場所 |
+|---|---|
+| 開発・運用ルール | `AGENTS.md` |
+| Claude Codeだけの補足 | `CLAUDE.md` |
+| プロバイダー選択 | Repository Variable `AI_PROVIDER` |
+| 定期実行する指示文 | Repository Variable `AI_PROMPT` |
+| APIキー | Repository Secrets |
+| スケジュール・権限・実行処理 | `.github/workflows/scheduled-session.yml` |
+
+個人だけに適用する設定はリポジトリへコミットせず、各ツールのユーザー設定へ置く。
+
 ## 認証と料金
 
 GitHub-hosted runnerはブラウザ認証を引き継がないため、非対話CIではAPIキーを使用する。どちらも各APIの従量課金となり、ChatGPTまたはClaudeの個人向け定額契約枠とは別扱いになる。
