@@ -29,3 +29,9 @@
 - 実行時刻、Secret名、Variable名を変えた場合は`README.md`と`SETUP_PROMPT.md`も同時に更新する。
 - 変更後はワークフロー構文を検証し、可能なら手動実行で対象プロバイダーを確認する。
 
+
+## モデル選定（Codex）
+
+- ワークフローではモデルを固定しない（Codex 既定の推奨モデルに従う）。固定する場合は `gpt-6.1-sol` を基準にし、提供終了したモデル（`gpt-5.5`、`gpt-5.4`、`gpt-5.3-codex` 系）は指定しない。
+- このリポジトリをローカルで開発するときは `gpt-6.1-sol` + `medium`、レビューは `high` を既定とする。
+- 根拠: https://developers.openai.com/codex/models （2026-10-31 確認）
